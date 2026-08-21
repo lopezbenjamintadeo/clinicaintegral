@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clinica}
+      POSTGRES_USER: ${POSTGRES_USER:-clinica}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinica_local_password}
+    volumes:
+      - clinica_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clinica} -d ${POSTGRES_DB:-clinica}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clinica}:${POSTGRES_PASSWORD:-clinica_local_password}@db:5432/${POSTGRES_DB:-clinica}
+      JWT_SECRET: ${JWT_SECRET:-desarrollo-cambiar-este-secreto-urgente}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      RECEPTION_PASSWORD: ${RECEPTION_PASSWORD:-Recepcion123!}
+      PROFESSIONAL_PASSWORD: ${PROFESSIONAL_PASSWORD:-Profesional123!}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CLINIC_NAME: ${CLINIC_NAME:-Clínica Integral}
+      CLINIC_SLUG: ${CLINIC_SLUG:-clinica-integral}
+      PLATFORM_API_KEY: ${PLATFORM_API_KEY:-}
+      PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-Propietario SaaS}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-owner@clinica.local}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-Owner123!}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v22.0}
+      WHATSAPP_TEMPLATE_NAME: ${WHATSAPP_TEMPLATE_NAME:-recordatorio_turno}
+      WHATSAPP_TEMPLATE_LANGUAGE: ${WHATSAPP_TEMPLATE_LANGUAGE:-es_AR}
+      WHATSAPP_REMINDER_HOURS: ${WHATSAPP_REMINDER_HOURS:-24}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
+    depends_on:
+      db:
+        condition: service_healthy
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - api
+volumes:
+  clinica_db:
